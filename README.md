@@ -5,4 +5,4 @@
 pip install numpy pandas seaborn matplotlib scikit-learn ipywidgets
 
 # 
-[website](https://flightapp-vuhqng.streamlit.app)
+[website](https://flightapp-vuhqng.streamlit.app) : https://flightapp-vuhqng.streamlit.app
