@@ -3,7 +3,7 @@ import pandas as pd
 import joblib
 
 #Load model
-model = joblib.load('flight_price_model.pkl')
+model = joblib.load('model.pkl')
 df = pd.read_csv('flight.csv')
 
 #tao gia dien
