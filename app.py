@@ -81,7 +81,7 @@ if st.button("Dự đoán ngay", type="primary"):
         input_data['month'] = input_data['f_time_from'].dt.month
         input_data['duration_minutes'] = (input_data['f_time_to'] - input_data['f_time_from']).dt.total_seconds() / 60
 
-        #One-Hot Encoding và Reindex
+        #One-Hot Encoding và reindex
         #Biến chữ thành số và sắp xếp đúng vị trí cột như lúc train
         input_encoded = pd.get_dummies(input_data, columns=['code_name', 'from', 'to', 'type'])
 
