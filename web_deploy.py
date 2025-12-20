@@ -3,152 +3,139 @@ import pandas as pd
 import numpy as np
 import joblib
 import xgboost as xgb
-from datetime import datetime
+from datetime import timedelta
 
-# --- CẤU HÌNH TRANG ---
-st.set_page_config(page_title="Dự Đoán Giá Vé Máy Bay", layout="wide")
+# 1. CẤU HÌNH TRANG VÀ TẢI MÔ HÌNH
+st.set_page_config(page_title="Dự Đoán Giá Vé Máy Bay Việt Nam", layout="wide")
 
-# --- DANH SÁCH CÁC CỘT (FEATURES) TỪ QUÁ TRÌNH TRAINING ---
-# Đây là danh sách chính xác thứ tự các cột mà mô hình yêu cầu (84 cột)
-MODEL_COLUMNS = [
-    'hour', 'day_of_week', 'day', 'month', 'duration_minutes',
-    'code_name_Pacific Airlines', 'code_name_Vietjet', 'code_name_Vietnam Airlines', 'code_name_Vietravel Airlines',
-    'from_Cần Thơ', 'from_Huế', 'from_Hà Nội', 'from_Hải Phòng', 'from_Nha Trang', 'from_Phú Quốc',
-    'from_Quy Nhơn', 'from_TP HCM', 'from_Thanh Hóa', 'from_Vinh', 'from_Đà Lạt', 'from_Đà Nẵng',
-    'to_Cần Thơ', 'to_Huế', 'to_Hà Nội', 'to_Hải Phòng', 'to_Nha Trang', 'to_Phú Quốc',
-    'to_Quy Nhơn', 'to_TP HCM', 'to_Thanh Hóa', 'to_Vinh', 'to_Đà Lạt', 'to_Đà Nẵng',
-    'type_Bregow (B) - Vé không hoàn', 'type_Business (BC)-D', 'type_Business (BC)-I', 'type_Business (BF)-C', 'type_Business (BF)-J',
-    'type_Buz Flex', 'type_Buz smart', 'type_Cregow (C) - Vé không hoàn', 'type_Dregow (D) - Vé không hoàn',
-    'type_Eco', 'type_Eco Flex', 'type_Eco Saver', 'type_Eco Saver max', 'type_Eco Smart',
-    'type_Economy (EC)-E', 'type_Economy (EC)-L', 'type_Economy (EC)-N', 'type_Economy (EC)-Q',
-    'type_Economy (EC)-R', 'type_Economy (EC)-T', 'type_Economy (EF)-H', 'type_Economy (EF)-K',
-    'type_Economy (EF)-S', 'type_Economy (EG)-M', 'type_Economy (EL)-A', 'type_Economy (EL)-P',
-    'type_Eregow (E) - Vé không hoàn', 'type_Hregow (H) - Vé không hoàn', 'type_Kregow (K) - Vé không hoàn',
-    'type_Lregow (L) - Vé không hoàn', 'type_Mregow (M) - Vé không hoàn', 'type_Nfleow (N) - Vé được hoàn',
-    'type_Ofleow (O) - Vé được hoàn', 'type_Promo1 (P) - Vé không hoàn', 'type_Qfleow (Q) - Vé được hoàn',
-    'type_Rfleow (R) - Vé được hoàn', 'type_Sfleow (S) - Vé được hoàn', 'type_SkyBoss',
-    'type_Tfleow (T) - Vé được hoàn', 'type_Vfleow (V) - Vé được hoàn', 'type_Yfleow (Y) - Vé được hoàn'
-]
-
-# --- LOAD MODELS ---
 @st.cache_resource
 def load_models():
-    try:
-        lin_reg = joblib.load('linear_regression_model.pkl')
-        xgb_model = joblib.load('xgboost_model.pkl')
-        return lin_reg, xgb_model
-    except Exception as e:
-        st.error(f"Lỗi khi tải mô hình: {e}")
-        return None, None
+    # Giả định file model đã được lưu từ quá trình huấn luyện
+    lr_model = joblib.load('linear_regression_model.pkl')
+    xgb_model = joblib.load('xgboost_model.pkl')
+    # Cần tải thêm danh sách cột mẫu để đồng bộ hóa (alignment)
+    model_columns = joblib.load('model_columns.pkl') 
+    return lr_model, xgb_model, model_columns
 
-lin_reg, xgb_model = load_models()
+try:
+    lr_model, xgb_model, model_columns = load_models()
+except FileNotFoundError:
+    st.error("Không tìm thấy file mô hình (.pkl). Vui lòng đảm bảo bạn đã huấn luyện và lưu model.")
+    st.stop()
 
-# --- GIAO DIỆN NGƯỜI DÙNG ---
-st.title("✈️ Dự Đoán Giá Vé Máy Bay Việt Nam")
-st.markdown("So sánh kết quả giữa mô hình **Linear Regression** và **XGBoost**.")
+# 2. XÂY DỰNG DỮ LIỆU THAM CHIẾU (DURATION & FEES ENGINE)
+# Dữ liệu từ phần phân tích 3.1 và 4.2
+DURATION_MAP = {
+    ("TP HCM", "Hà Nội"): 125, ("Hà Nội", "TP HCM"): 125,
+    ("TP HCM", "Đà Nẵng"): 85, ("Đà Nẵng", "TP HCM"): 85,
+    ("TP HCM", "Phú Quốc"): 65, ("Phú Quốc", "TP HCM"): 65,
+    ("TP HCM", "Nha Trang"): 70, ("Nha Trang", "TP HCM"): 70,
+    ("TP HCM", "Đà Lạt"): 55, ("Đà Lạt", "TP HCM"): 55,
+    ("TP HCM", "Hải Phòng"): 120, ("Hải Phòng", "TP HCM"): 120,
+    ("TP HCM", "Vinh"): 110, ("Vinh", "TP HCM"): 110,
+    ("TP HCM", "Thanh Hóa"): 120, ("Thanh Hóa", "TP HCM"): 120,
+    ("Hà Nội", "Đà Nẵng"): 80, ("Đà Nẵng", "Hà Nội"): 80,
+    ("Hà Nội", "Phú Quốc"): 130, ("Phú Quốc", "Hà Nội"): 130,
+    ("Hà Nội", "Nha Trang"): 115, ("Nha Trang", "Hà Nội"): 115,
+    ("Hà Nội", "Đà Lạt"): 110, ("Đà Lạt", "Hà Nội"): 110,
+    ("Hà Nội", "Cần Thơ"): 135, ("Cần Thơ", "Hà Nội"): 135,
+    #... Bổ sung thêm các chặng khác nếu cần
+}
 
-# Tạo 2 cột cho form nhập liệu
-col1, col2 = st.columns(2)
+FEE_MAP = {
+    "Vietnam Airlines": 660000,
+    "Vietjet": 650000,
+    "Bamboo Airways": 657000,
+    "Pacific Airlines": 655000,
+    "Vietravel Airlines": 646000
+}
 
-with col1:
-    st.subheader("Thông tin chuyến bay")
+# 3. GIAO DIỆN NHẬP LIỆU (SIDEBAR)
+st.sidebar.header("Thông tin Chuyến bay")
+
+airlines = list(FEE_MAP.keys())
+cities =
+ticket_types = # Cần khớp với dữ liệu huấn luyện
+
+selected_airline = st.sidebar.selectbox("Hãng hàng không", airlines)
+origin = st.sidebar.selectbox("Điểm đi", cities)
+# Loại bỏ điểm đi khỏi danh sách điểm đến để tránh chọn trùng
+dest_options = [c for c in cities if c!= origin]
+destination = st.sidebar.selectbox("Điểm đến", dest_options)
+
+dep_date = st.sidebar.date_input("Ngày bay")
+dep_time = st.sidebar.time_input("Giờ khởi hành")
+ticket_cls = st.sidebar.selectbox("Hạng vé", ticket_types)
+
+# 4. LOGIC XỬ LÝ (BACKEND)
+if st.sidebar.button("Dự đoán Giá Vé"):
+    # 4.1 Tính toán Duration và Arrival Time
+    duration_mins = DURATION_MAP.get((origin, destination), 120) # Mặc định 120p nếu không tìm thấy
     
-    # 1. Hãng bay (Bamboo Airways là reference category nên không có trong list cột, ta thêm vào UI để xử lý logic)
-    airline_options = ['Bamboo Airways', 'Pacific Airlines', 'Vietjet', 'Vietnam Airlines', 'Vietravel Airlines']
-    airline = st.selectbox("Hãng hàng không", airline_options)
-
-    # 2. Điểm đi và đến
-    # Lấy danh sách thành phố từ tên cột (bỏ tiền tố 'from_' hoặc 'to_')
-    city_options = sorted(list(set([c.replace('from_', '') for c in MODEL_COLUMNS if c.startswith('from_')])))
-    # Thêm tùy chọn "Khác" cho các thành phố bị ẩn do drop_first=True (Reference Category)
-    city_options.append("Khác (Thành phố khác)")
+    # Kết hợp ngày và giờ
+    full_dep_datetime = pd.to_datetime(f"{dep_date} {dep_time}")
+    full_arr_datetime = full_dep_datetime + timedelta(minutes=duration_mins)
     
-    source = st.selectbox("Điểm đi", city_options, index=city_options.index('Hà Nội') if 'Hà Nội' in city_options else 0)
-    destination = st.selectbox("Điểm đến", city_options, index=city_options.index('TP HCM') if 'TP HCM' in city_options else 0)
-
-    # 3. Thời gian bay (thay vì nhập giờ hạ cánh)
-    duration = st.number_input("Thời gian bay dự kiến (phút)", min_value=30, max_value=300, value=120, step=5, help="Ví dụ: Bay Hà Nội - Sài Gòn khoảng 120 phút")
-
-with col2:
-    st.subheader("Chi tiết vé & Thời gian")
+    # 4.2 Trích xuất đặc trưng (Feature Extraction)
+    # Lưu ý: Tên cột phải KHỚP CHÍNH XÁC với lúc train (ví dụ: 'day_of_week', 'month'...)
+    input_data = {
+        'f_price': 0, # Giá trị giả định, có thể không dùng nếu model predict total
+        'fees': FEE_MAP.get(selected_airline, 650000),
+        'duration_minutes': duration_mins,
+        'day_of_week': full_dep_datetime.dayofweek, # 0=Monday, 6=Sunday
+        'day': full_dep_datetime.day,
+        'month': full_dep_datetime.month,
+        'hour': full_dep_datetime.hour,
+        # Các cột category sẽ được OHE bên dưới
+        'code_name': selected_airline,
+        'from': origin,
+        'to': destination,
+        'type': ticket_cls
+    }
     
-    # 4. Loại vé
-    type_options = sorted([c.replace('type_', '') for c in MODEL_COLUMNS if c.startswith('type_')])
-    ticket_type = st.selectbox("Hạng vé", type_options, index=type_options.index('Eco') if 'Eco' in type_options else 0)
-
-    # 5. Ngày giờ khởi hành
-    dep_date = st.date_input("Ngày khởi hành", datetime.now())
-    dep_time = st.time_input("Giờ khởi hành", datetime.now())
-
-# --- XỬ LÝ DỮ LIỆU ĐẦU VÀO ---
-def preprocess_input(airline, source, destination, ticket_type, dep_date, dep_time, duration):
-    # Tạo vector đầu vào với toàn số 0
-    input_data = pd.DataFrame(np.zeros((1, len(MODEL_COLUMNS))), columns=MODEL_COLUMNS)
+    # Tạo DataFrame ban đầu
+    df_input = pd.DataFrame([input_data])
     
-    # 1. Điền các biến số học
-    # Ghép ngày và giờ
-    flight_datetime = datetime.combine(dep_date, dep_time)
+    # 4.3 One-Hot Encoding và Alignment
+    # Thực hiện get_dummies cho dữ liệu nhập
+    df_processed = pd.get_dummies(df_input)
     
-    input_data['hour'] = flight_datetime.hour
-    input_data['day_of_week'] = flight_datetime.weekday()
-    input_data['day'] = flight_datetime.day
-    input_data['month'] = flight_datetime.month
-    input_data['duration_minutes'] = duration
-
-    # 2. One-Hot Encoding (Điền số 1 vào các cột tương ứng)
-    # Lưu ý: Nếu chọn Bamboo Airways hoặc thành phố "Khác", tất cả các cột liên quan sẽ giữ nguyên là 0 (đúng logic drop_first)
+    # CỰC KỲ QUAN TRỌNG: Reindex để khớp với cột của model
+    # Thiếu bước này model sẽ báo lỗi shape hoặc predict sai
+    df_final = df_processed.reindex(columns=model_columns, fill_value=0)
     
-    # Hãng bay
-    if f'code_name_{airline}' in MODEL_COLUMNS:
-        input_data[f'code_name_{airline}'] = 1
-        
-    # Điểm đi
-    if f'from_{source}' in MODEL_COLUMNS:
-        input_data[f'from_{source}'] = 1
-        
-    # Điểm đến
-    if f'to_{destination}' in MODEL_COLUMNS:
-        input_data[f'to_{destination}'] = 1
-        
-    # Loại vé
-    if f'type_{ticket_type}' in MODEL_COLUMNS:
-        input_data[f'type_{ticket_type}'] = 1
-        
-    return input_data
-
-# --- NÚT DỰ ĐOÁN ---
-if st.button("🔍 Dự đoán giá vé", use_container_width=True):
-    if lin_reg and xgb_model:
-        # Xử lý dữ liệu
-        X_input = preprocess_input(airline, source, destination, ticket_type, dep_date, dep_time, duration)
-        
-        # Dự đoán
+    # 5. DỰ ĐOÁN VÀ HIỂN THỊ
+    st.title("Kết quả Dự đoán Giá Vé Máy Bay")
+    st.write(f"✈️ **Hành trình:** {origin} ➝ {destination} | **Hãng:** {selected_airline}")
+    st.write(f"🕒 **Thời gian bay dự kiến:** {duration_mins} phút")
+    
+    # Layout 2 cột cho 2 model
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Mô hình Hồi quy Tuyến tính (Linear Regression)")
         try:
-            price_lr = lin_reg.predict(X_input)[0]
-            price_xgb = xgb_model.predict(X_input)[0]
-            
-            # Hiển thị kết quả
-            st.markdown("---")
-            res_col1, res_col2 = st.columns(2)
-            
-            with res_col1:
-                st.info("🤖 **Linear Regression**")
-                st.metric(label="Giá dự đoán", value=f"{price_lr:,.0f} VNĐ")
-            
-            with res_col2:
-                st.success("🚀 **XGBoost (Thường chính xác hơn)**")
-                st.metric(label="Giá dự đoán", value=f"{price_xgb:,.0f} VNĐ")
-                
-            # So sánh
-            diff = abs(price_lr - price_xgb)
-            st.caption(f"Chênh lệch giữa 2 mô hình: {diff:,.0f} VNĐ")
-            
+            pred_lr = lr_model.predict(df_final)
+            st.metric(label="Giá dự đoán", value=f"{pred_lr:,.0f} VND")
+            st.info("Mô hình này hoạt động tốt với các xu hướng giá tuyến tính, ổn định.")
         except Exception as e:
-            st.error(f"Có lỗi xảy ra khi dự đoán: {e}")
-            st.write("Vui lòng kiểm tra lại dữ liệu đầu vào hoặc file model.")
-    else:
-        st.warning("Chưa tải được file model. Vui lòng kiểm tra file .pkl trong thư mục.")
+            st.error(f"Lỗi dự đoán Linear: {e}")
 
-# --- FOOTER ---
-st.markdown("---")
-st.markdown("*Lưu ý: Giá vé chỉ mang tính chất tham khảo dựa trên dữ liệu lịch sử.*")
+    with col2:
+        st.subheader("Mô hình XGBoost (Non-linear)")
+        try:
+            # XGBoost đôi khi yêu cầu input dạng DMatrix hoặc numpy array thuần tùy phiên bản
+            pred_xgb = xgb_model.predict(df_final)
+            st.metric(label="Giá dự đoán", value=f"{pred_xgb:,.0f} VND")
+            st.success("Mô hình này nắm bắt tốt các biến động giá phức tạp (mùa vụ, giờ cao điểm).")
+        except Exception as e:
+            st.error(f"Lỗi dự đoán XGBoost: {e}")
+            
+    # Phân tích chênh lệch
+    diff = abs(pred_lr - pred_xgb)
+    st.write("---")
+    st.write(f"💡 **Nhận định:** Hai mô hình có mức chênh lệch là {diff:,.0f} VND. "
+             "Nếu chênh lệch thấp, độ tin cậy cao. Nếu chênh lệch lớn, chuyến bay có thể rơi vào các điều kiện đặc biệt (lễ, tết) mà XGBoost thường xử lý tốt hơn.")
+
+else:
+    st.info("Vui lòng chọn thông tin chuyến bay bên thanh trái và bấm 'Dự đoán Giá Vé'.")
