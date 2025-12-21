@@ -63,9 +63,26 @@ FEE_MAP = {
 
 # Danh sách các lựa chọn cho Dropdown
 AIRLINES = list(FEE_MAP.keys())
-CITIES =
-# Các loại vé phổ biến (Cần khớp với dữ liệu lúc train)
-TICKET_TYPES =
+CITIES = [
+    'TP HCM', 'Hà Nội', 'Đà Nẵng', 'Phú Quốc', 'Nha Trang', 'Đà Lạt', 
+    'Hải Phòng', 'Vinh', 'Thanh Hóa', 'Cần Thơ', 'Huế', 'Quy Nhơn'
+]
+
+# Danh sách hạng vé (Trích xuất từ các cột type_... trong notebook)
+TICKET_TYPES = [
+    'Eco', 'Eco Saver', 'Eco Smart', 'Eco Flex', 'SkyBoss', 
+    'Buz Smart', 'Buz Flex',
+    'Economy (EL)-P', 'Economy (EL)-A', 'Economy (EC)-T', 'Economy (EC)-R',
+    'Economy (EC)-N', 'Economy (EC)-Q', 'Economy (EC)-L', 'Economy (EC)-E',
+    'Economy (EF)-H', 'Economy (EF)-K', 'Economy (EF)-S', 'Economy (EG)-M',
+    'Business (BC)-D', 'Business (BC)-I', 'Business (BF)-C', 'Business (BF)-J',
+    'Promo1 (P) - Vé không hoàn', 
+    'Aregow (A) - Vé không hoàn', 'Bregow (B) - Vé không hoàn',
+    'Cregow (C) - Vé không hoàn', 'Dregow (D) - Vé không hoàn',
+    'Eregow (E) - Vé không hoàn', 'Hregow (H) - Vé không hoàn',
+    'Kregow (K) - Vé không hoàn', 'Lregow (L) - Vé không hoàn',
+    'Mregow (M) - Vé không hoàn'
+]
 
 # ---------------------------------------------------------
 # 2. HÀM XỬ LÝ MODEL VÀ DỮ LIỆU
