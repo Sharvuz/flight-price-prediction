@@ -138,8 +138,7 @@ with col_ui_2:
         
         # Phí sân bay/hãng (Feature engineer)
         est_fees = FEE_MAP.get(airline, 650000)
-        info_col3.metric("Phí & Thuế (Ước tính)", f"{est_fees:,} VND")
-
+        
         # --- BƯỚC 2: CHUẨN BỊ DỮ LIỆU CHO MODEL ---
         # Tạo dictionary input thô
         input_data = {
