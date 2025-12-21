@@ -5,4 +5,5 @@
 pip install numpy pandas seaborn matplotlib scikit-learn ipywidgets streamlit joblib xgboost
 
 # 
-[website](https://flightapp-vuhqng.streamlit.app) : https://flightapp-vuhqng.streamlit.app
+### [website](https://flight-price-prediction-20.streamlit.app):
+https://flight-price-prediction-20.streamlit.app
